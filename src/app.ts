@@ -8,7 +8,12 @@ export const app = express();
 
 app.use(express.json());
 app.use(requestIdMiddleware);
-app.use(morgan('dev'));
+
+morgan.token('request-id', (req) => (req as any).requestId);
+
+app.use(
+  morgan(':method :url :status :response-time ms - reqId=:request-id')
+);
 
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });
