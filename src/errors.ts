@@ -33,3 +33,12 @@ export class ConflictError extends AppError {
   statusCode = 409;
   errorCode = 'CONFLICT';
 }
+
+export class RegistrationFailedError extends AppError {
+  statusCode = 400;
+  errorCode = 'REGISTRATION_FAILED';
+
+  constructor() {
+    super('REGISTRATION_FAILED');
+  }
+}

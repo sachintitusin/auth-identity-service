@@ -4,6 +4,8 @@ import { pool } from './db';
 import { requestIdMiddleware } from './request-id';
 import { errorHandler } from './error-handler';
 
+import { register } from './auth.register';
+
 export const app = express();
 
 app.use(express.json());
@@ -27,6 +29,8 @@ app.get('/health/db', async (_req, res, next) => {
     next(err);
   }
 });
+
+app.post('/auth/register', register);
 
 
 app.use(errorHandler);
