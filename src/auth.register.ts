@@ -7,10 +7,6 @@ import { RegistrationFailedError } from './errors';
 export async function register(req: Request, res: Response) {
   const { email, password } = req.body;
 
-  if (typeof email !== 'string' || typeof password !== 'string') {
-    return res.status(400).json({ error: 'INVALID_INPUT' });
-  }
-
   const client = await pool.connect();
 
   try {

@@ -5,6 +5,8 @@ import { requestIdMiddleware } from './request-id';
 import { errorHandler } from './error-handler';
 
 import { register } from './auth.register';
+import { validateBody } from './middleware/validate';
+import { registerSchema } from './schemas/register.schema';
 
 export const app = express();
 
@@ -30,7 +32,7 @@ app.get('/health/db', async (_req, res, next) => {
   }
 });
 
-app.post('/auth/register', register);
+app.post('/auth/register', validateBody(registerSchema), register);
 
 
 app.use(errorHandler);
