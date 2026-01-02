@@ -36,7 +36,7 @@ app.get('/health/db', async (_req, res, next) => {
 });
 
 app.post('/auth/register', validateBody(registerSchema), register);
-app.post('/login', validateBody(loginSchema), async (req, res) => {
+app.post('/auth/login', validateBody(loginSchema), async (req, res) => {
   const result = await login(req);
 
   // for mobile clients X-Refresh-Token-Delivery = "body"
