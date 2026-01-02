@@ -1,4 +1,5 @@
 import { PoolClient } from 'pg';
+import { randomUUID, randomBytes, createHash } from 'crypto';
 
 /**
  * Fetch refresh token record by hashed token.
@@ -11,14 +12,17 @@ export async function findRefreshTokenByHash(
   const res = await client.query(
     `
     SELECT
-      id,
-      session_id,
-      used_at,
-      revoked_at,
-      expires_at,
-      replaced_by_token_id
-    FROM refresh_tokens
-    WHERE hashed_token = $1
+      rt.id,
+      rt.session_id,
+      rt.used_at,
+      rt.revoked_at,
+      rt.expires_at,
+      rt.replaced_by_token_id,
+      i.subject_id AS identity_subject
+    FROM refresh_tokens rt
+    JOIN sessions s ON s.id = rt.session_id
+    JOIN identities i ON i.id = s.identity_id
+    WHERE rt.hashed_token = $1
     LIMIT 1
     `,
     [hashedToken]
@@ -53,12 +57,18 @@ export async function markRefreshTokenUsed(
 export async function createRefreshToken(
   client: PoolClient,
   params: {
-    id: string;
     sessionId: string;
-    hashedToken: Buffer;
-    expiresAt: Date;
+    replacesTokenId?: string;
   }
-) {
+): Promise<{ rawRefreshToken: string }> {
+  const rawRefreshToken = randomBytes(32).toString('base64url');
+
+  const hashedToken = createHash('sha256')
+    .update(rawRefreshToken)
+    .digest();
+
+  const refreshTokenId = randomUUID();
+
   await client.query(
     `
     INSERT INTO refresh_tokens (
@@ -66,15 +76,25 @@ export async function createRefreshToken(
       session_id,
       hashed_token,
       expires_at
-    ) VALUES ($1, $2, $3, $4)
+    ) VALUES ($1, $2, $3, now() + interval '30 days')
     `,
-    [
-      params.id,
-      params.sessionId,
-      params.hashedToken,
-      params.expiresAt,
-    ]
+    [refreshTokenId, params.sessionId, hashedToken]
   );
+
+  if (params.replacesTokenId) {
+    await client.query(
+      `
+      UPDATE refresh_tokens
+      SET
+        used_at = now(),
+        replaced_by_token_id = $2
+      WHERE id = $1
+      `,
+      [params.replacesTokenId, refreshTokenId]
+    );
+  }
+
+  return { rawRefreshToken };
 }
 
 /**

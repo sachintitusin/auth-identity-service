@@ -11,9 +11,11 @@ import { validateBody } from './middleware/validate';
 import { registerSchema } from './schemas/register.schema';
 import { refreshTokens } from './tokens.refresh';
 import { loginSchema } from './schemas/login.schema';
+import cookieParser from 'cookie-parser';
 
 export const app = express();
 
+app.use(cookieParser());
 app.use(express.json());
 app.use(requestIdMiddleware);
 

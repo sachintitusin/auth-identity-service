@@ -11,9 +11,10 @@ import { issueAccessToken } from './domain/access-token.service';
 export async function refreshTokens(req: Request, res: Response) {
   try {
     let refreshToken: string | undefined;
+    const delivery = req.header('X-Refresh-Token-Delivery');
 
     // --- Extract refresh token ---
-    if (req.header('X-Refresh-Token-Delivery') === 'body') {
+    if (delivery === 'body') {
       refreshToken = req.body?.refresh_token;
     } else {
       refreshToken = req.cookies?.refresh_token;
@@ -24,18 +25,18 @@ export async function refreshTokens(req: Request, res: Response) {
     }
 
     // --- Domain refresh orchestration ---
-    const { sessionId, refreshToken: newRefreshToken } =
+    const { sessionId, identitySubject, refreshToken: newRefreshToken } =
       await refreshSessionTokens(refreshToken);
 
     // --- Issue access token ---
     // NOTE: subject will be corrected in Phase 6
     const { accessToken, expiresIn } = issueAccessToken({
-      subject: sessionId,
+      subject: identitySubject,
       sessionId,
     });
 
     // --- Deliver refresh token ---
-    if (req.header('X-Refresh-Token-Delivery') === 'body') {
+    if (delivery === 'body') {
       return res.status(200).json({
         access_token: accessToken,
         refresh_token: newRefreshToken,
@@ -46,7 +47,7 @@ export async function refreshTokens(req: Request, res: Response) {
     // Default: HttpOnly cookie
     res.cookie('refresh_token', newRefreshToken, {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
       path: '/tokens/refresh',
     });
