@@ -5,8 +5,11 @@ import { requestIdMiddleware } from './request-id';
 import { errorHandler } from './error-handler';
 
 import { register } from './auth.register';
+import { login } from './auth.login';
+
 import { validateBody } from './middleware/validate';
 import { registerSchema } from './schemas/register.schema';
+import { loginSchema } from './schemas/login.schema';
 
 export const app = express();
 
@@ -33,6 +36,33 @@ app.get('/health/db', async (_req, res, next) => {
 });
 
 app.post('/auth/register', validateBody(registerSchema), register);
+app.post('/login', validateBody(loginSchema), async (req, res) => {
+  const result = await login(req);
 
+  // for mobile clients X-Refresh-Token-Delivery = "body"
+  const delivery = req.header('X-Refresh-Token-Delivery');
+
+  // Pattern 1: always set HttpOnly cookie
+  res.cookie('refresh_token', result._refreshToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'strict',
+    path: '/tokens/refresh',
+  });
+
+  // Explicit mobile opt-in. 
+  // Mobile  gets refresh token in body
+  if (delivery === 'body') {
+    return res.status(200).json({
+      session: result.session,
+      refresh_token: result._refreshToken,
+    });
+  }
+
+  // Default: browser-safe response
+  return res.status(200).json({
+    session: result.session,
+  });
+});
 
 app.use(errorHandler);
