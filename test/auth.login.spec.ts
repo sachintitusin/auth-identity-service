@@ -2,7 +2,7 @@ import request from 'supertest';
 import { app } from '../src/app';
 import { pool } from '../src/db';
 
-describe('POST /login', () => {
+describe('POST /auth/login', () => {
   const email = 'login.user@example.com';
   const password = 'StrongPassword123!';
 
@@ -39,7 +39,7 @@ describe('POST /login', () => {
 
   it('logs in via browser and sets refresh token only as HttpOnly cookie', async () => {
     const res = await request(app)
-      .post('/login')
+      .post('/auth/login')
       .send({ email, password });
 
     expect(res.status).toBe(200);
@@ -79,7 +79,7 @@ describe('POST /login', () => {
 
   it('logs in via mobile and returns refresh token in response body', async () => {
     const res = await request(app)
-      .post('/login')
+      .post('/auth/login')
       .set('X-Refresh-Token-Delivery', 'body')
       .send({ email, password });
 
@@ -108,7 +108,7 @@ describe('POST /login', () => {
 
   it('fails with uniform 401 for wrong password and creates no session', async () => {
     const res = await request(app)
-      .post('/login')
+      .post('/auth/login')
       .send({ email, password: 'WrongPassword!' });
 
     expect(res.status).toBe(401);
@@ -126,7 +126,7 @@ describe('POST /login', () => {
 
   it('fails with uniform 401 for unknown email', async () => {
     const res = await request(app)
-      .post('/login')
+      .post('/auth/login')
       .send({
         email: 'doesnotexist@example.com',
         password: 'Whatever123!',
@@ -149,7 +149,7 @@ describe('POST /login', () => {
       .send({ email: unverifiedEmail, password });
 
     const res = await request(app)
-      .post('/login')
+      .post('/auth/login')
       .send({ email: unverifiedEmail, password });
 
     expect(res.status).toBe(401);
