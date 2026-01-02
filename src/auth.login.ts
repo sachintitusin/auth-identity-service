@@ -1,7 +1,8 @@
-import { Request, Response } from 'express';
+import { Request} from 'express';
 import { pool } from './db';
-import { randomUUID, randomBytes, createHash } from 'crypto';
+import { randomUUID } from 'crypto';
 import bcrypt from 'bcrypt';
+import { createRefreshToken } from './repos/refresh-tokens.repo';
 import { UnauthorizedError } from './errors';
 
 
@@ -95,22 +96,9 @@ export async function login(req: Request): Promise<LoginResult> {
       [sessionId, identity_id, sessionIdentifier]
     );
 
-    const rawRefreshToken = randomBytes(32);
-    const hashedRefreshToken = createHash('sha256')
-      .update(rawRefreshToken)
-      .digest();
-
-    await client.query(
-      `
-      INSERT INTO refresh_tokens (
-        id,
-        session_id,
-        hashed_token,
-        expires_at
-      ) VALUES ($1, $2, $3, now() + interval '30 days')
-      `,
-      [randomUUID(), sessionId, hashedRefreshToken]
-    );
+    const { rawRefreshToken } = await createRefreshToken(client, {
+      sessionId,
+    });
 
     await client.query('COMMIT');
 
@@ -123,7 +111,7 @@ export async function login(req: Request): Promise<LoginResult> {
         id: sessionIdentifier,
       },
       // the _ before _refreshToken means it is for internal use only
-      _refreshToken: rawRefreshToken.toString('base64url'),
+      _refreshToken: rawRefreshToken,
     };
   } catch (err) {
     await client.query('ROLLBACK');
