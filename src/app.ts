@@ -9,6 +9,7 @@ import { login } from './auth.login';
 
 import { validateBody } from './middleware/validate';
 import { registerSchema } from './schemas/register.schema';
+import { refreshTokens } from './tokens.refresh';
 import { loginSchema } from './schemas/login.schema';
 
 export const app = express();
@@ -64,5 +65,7 @@ app.post('/auth/login', validateBody(loginSchema), async (req, res) => {
     session: result.session,
   });
 });
+
+app.post('/tokens/refresh', refreshTokens);
 
 app.use(errorHandler);
