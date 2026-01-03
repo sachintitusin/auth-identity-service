@@ -71,14 +71,31 @@ export async function createRefreshToken(
     replacesTokenId?: string;
   }
 ): Promise<{ rawRefreshToken: string }> {
+  // Generate a new opaque refresh token for the client
   const rawRefreshToken = randomBytes(32).toString('base64url');
 
+  // Store only a hash of the token
   const hashedToken = createHash('sha256')
     .update(rawRefreshToken)
     .digest();
 
   const refreshTokenId = randomUUID();
 
+  // Deactivate the previous refresh token first to ensure
+  // there is never more than one active token per session
+  if (params.replacesTokenId) {
+    await client.query(
+      `
+      UPDATE refresh_tokens
+      SET used_at = now()
+      WHERE id = $1
+        AND used_at IS NULL
+      `,
+      [params.replacesTokenId]
+    );
+  }
+
+  // Create the new refresh token for the session
   await client.query(
     `
     INSERT INTO refresh_tokens (
@@ -91,13 +108,12 @@ export async function createRefreshToken(
     [refreshTokenId, params.sessionId, hashedToken]
   );
 
+  // Link the old token to its replacement for rotation lineage
   if (params.replacesTokenId) {
     await client.query(
       `
       UPDATE refresh_tokens
-      SET
-        used_at = now(),
-        replaced_by_token_id = $2
+      SET replaced_by_token_id = $2
       WHERE id = $1
       `,
       [params.replacesTokenId, refreshTokenId]
@@ -106,6 +122,7 @@ export async function createRefreshToken(
 
   return { rawRefreshToken };
 }
+
 
 /**
  * Revoke an entire session and all associated refresh tokens.
