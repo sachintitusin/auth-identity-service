@@ -3,7 +3,7 @@ import { pool } from './db';
 import { randomUUID } from 'crypto';
 import bcrypt from 'bcrypt';
 import { createRefreshToken } from './repos/refresh-tokens.repo';
-import { UnauthorizedError } from './errors';
+import { AuthenticationFailedError } from './errors';
 
 
 export type LoginResult = {
@@ -32,7 +32,7 @@ export async function login(req: Request): Promise<LoginResult> {
     );
 
     if (identifierResult.rowCount === 0) {
-      throw new UnauthorizedError('AUTHENTICATION_FAILED');
+      throw new AuthenticationFailedError();
     }
 
     const { identity_id } = identifierResult.rows[0];
@@ -50,7 +50,7 @@ export async function login(req: Request): Promise<LoginResult> {
     );
 
     if (credentialResult.rowCount === 0) {
-      throw new UnauthorizedError('AUTHENTICATION_FAILED');
+      throw new AuthenticationFailedError();
     }
 
     const credentialId = credentialResult.rows[0].id;
@@ -67,7 +67,7 @@ export async function login(req: Request): Promise<LoginResult> {
 
     if (passwordResult.rowCount === 0) {
       // Defensive: should never happen if invariants hold
-      throw new UnauthorizedError('AUTHENTICATION_FAILED');
+      throw new AuthenticationFailedError();
     }
 
     const { password_hash } = passwordResult.rows[0];
@@ -76,7 +76,7 @@ export async function login(req: Request): Promise<LoginResult> {
     const passwordMatches = await bcrypt.compare(password, password_hash);
 
     if (!passwordMatches) {
-      throw new UnauthorizedError('AUTHENTICATION_FAILED');
+      throw new AuthenticationFailedError();
     }
 
     // ---- 5. Create session + refresh token (transactional) ----
@@ -117,7 +117,7 @@ export async function login(req: Request): Promise<LoginResult> {
     await client.query('ROLLBACK');
 
     // Collapse all auth failures intentionally
-    throw new UnauthorizedError('AUTHENTICATION_FAILED');
+    throw err
   } finally {
     client.release();
   }
