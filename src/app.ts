@@ -14,6 +14,8 @@ import { refreshTokens } from './tokens.refresh';
 import { loginSchema } from './schemas/login.schema';
 import cookieParser from 'cookie-parser';
 import { authenticateAccessToken } from './middleware/authenticate-access-token';
+import { logoutAllSessions } from './sessions.logout.all';
+
 
 export const app = express();
 
@@ -72,5 +74,11 @@ app.post('/auth/login', validateBody(loginSchema), async (req, res) => {
 
 app.post('/tokens/refresh', refreshTokens);
 app.delete('/sessions/current', authenticateAccessToken, logoutCurrentSession);
+app.delete(
+  '/sessions',
+  authenticateAccessToken,
+  logoutAllSessions
+);
+
 
 app.use(errorHandler);

@@ -43,6 +43,7 @@ export function authenticateAccessToken(
   // Inject authenticated context
   (req as any).identityId = payload.sub;
   (req as any).sessionId = payload.sid;
+  (req as any).identityId = payload.sub;
 
   next();
 }

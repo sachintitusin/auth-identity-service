@@ -172,3 +172,38 @@ export async function updateSessionTokenIssuedAt(
     [sessionId]
   );
 }
+
+
+export async function revokeAllSessionsForIdentity(
+  client: PoolClient,
+  identityId: string,
+  reason: 'USER_LOGOUT' | 'PASSWORD_CHANGE' | 'ADMIN_REVOCATION'
+) {
+  // 1. Revoke all refresh tokens for active sessions
+  await client.query(
+    `
+    UPDATE refresh_tokens
+    SET revoked_at = now()
+    WHERE session_id IN (
+      SELECT id
+      FROM sessions
+      WHERE identity_id = $1
+        AND terminated_at IS NULL
+    )
+    `,
+    [identityId]
+  );
+
+  // 2. Terminate all active sessions
+  await client.query(
+    `
+    UPDATE sessions
+    SET
+      terminated_at = now(),
+      termination_reason = $2
+    WHERE identity_id = $1
+      AND terminated_at IS NULL
+    `,
+    [identityId, reason]
+  );
+}
