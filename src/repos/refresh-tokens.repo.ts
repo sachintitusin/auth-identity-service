@@ -130,7 +130,8 @@ export async function createRefreshToken(
  */
 export async function revokeSessionAndTokens(
   client: PoolClient,
-  sessionId: string
+  sessionId: string,
+  reason: 'USER_LOGOUT' | 'TOKEN_REUSE' | 'PASSWORD_CHANGE' | 'ADMIN_REVOCATION'
 ) {
   await client.query(
     `
@@ -147,11 +148,11 @@ export async function revokeSessionAndTokens(
     UPDATE sessions
     SET
       terminated_at = now(),
-      termination_reason = 'TOKEN_REUSE'
+      termination_reason = $2
     WHERE id = $1
       AND terminated_at IS NULL
     `,
-    [sessionId]
+    [sessionId, reason]
   );
 }
 
