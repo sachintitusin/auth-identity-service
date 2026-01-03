@@ -11,7 +11,7 @@ export function errorHandler(
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
       error: err.errorCode,
-      message: err.message,
+      // message: err.message,
     });
   }
 
@@ -20,6 +20,6 @@ export function errorHandler(
 
   return res.status(500).json({
     error: 'INTERNAL_SERVER_ERROR',
-    message: 'Something went wrong',
+    // message: 'Something went wrong',
   });
 }
