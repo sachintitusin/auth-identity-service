@@ -10,6 +10,14 @@ import { issueAccessToken } from './domain/access-token.service';
  */
 export async function refreshTokens(req: Request, res: Response) {
   try {
+
+    const hasBodyToken = Boolean(req.body?.refresh_token);
+    const hasCookieToken = Boolean(req.cookies?.refresh_token);
+
+    if (hasBodyToken && hasCookieToken) {
+      return res.status(401).json({ error: 'AUTHENTICATION_FAILED' });
+    }
+
     let refreshToken: string | undefined;
     const delivery = req.header('X-Refresh-Token-Delivery');
 
