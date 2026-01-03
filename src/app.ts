@@ -9,9 +9,11 @@ import { login } from './auth.login';
 
 import { validateBody } from './middleware/validate';
 import { registerSchema } from './schemas/register.schema';
+import { logoutCurrentSession } from './sessions.logout';
 import { refreshTokens } from './tokens.refresh';
 import { loginSchema } from './schemas/login.schema';
 import cookieParser from 'cookie-parser';
+import { authenticateAccessToken } from './middleware/authenticate-access-token';
 
 export const app = express();
 
@@ -69,5 +71,6 @@ app.post('/auth/login', validateBody(loginSchema), async (req, res) => {
 });
 
 app.post('/tokens/refresh', refreshTokens);
+app.delete('/sessions/current', authenticateAccessToken, logoutCurrentSession);
 
 app.use(errorHandler);
