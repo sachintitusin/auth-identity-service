@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { refreshSessionTokens } from './domain/refresh-tokens.service';
 import { issueAccessToken } from './domain/access-token.service';
+import { AuthenticationFailedError } from './errors';
+
 
 /**
  * POST /tokens/refresh
@@ -15,7 +17,7 @@ export async function refreshTokens(req: Request, res: Response) {
     const hasCookieToken = Boolean(req.cookies?.refresh_token);
 
     if (hasBodyToken && hasCookieToken) {
-      return res.status(401).json({ error: 'AUTHENTICATION_FAILED' });
+      throw new AuthenticationFailedError();
     }
 
     let refreshToken: string | undefined;
@@ -29,7 +31,7 @@ export async function refreshTokens(req: Request, res: Response) {
     }
 
     if (!refreshToken) {
-      return res.status(401).json({ error: 'AUTHENTICATION_FAILED' });
+      throw new AuthenticationFailedError();
     }
 
     // --- Domain refresh orchestration ---
@@ -64,8 +66,8 @@ export async function refreshTokens(req: Request, res: Response) {
       access_token: accessToken,
       expires_in: expiresIn,
     });
-  } catch {
+  } catch (err) {
     // Fail closed
-    return res.status(401).json({ error: 'AUTHENTICATION_FAILED' });
+    throw err
   }
 }
