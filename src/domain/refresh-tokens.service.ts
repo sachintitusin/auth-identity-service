@@ -7,6 +7,7 @@ import {
   updateSessionTokenIssuedAt,
 } from '../repos/refresh-tokens.repo';
 import { AuthenticationFailedError } from '../errors';
+import { SessionTerminationReason } from './session-termination-reason';
 
 
 
@@ -47,7 +48,7 @@ export async function refreshSessionTokens(rawRefreshToken: string) {
       expires_at <= now
     ) {
       // Enforce INV-TOKEN-3
-      await revokeSessionAndTokens(client, sessionId);
+      await revokeSessionAndTokens(client, sessionId, SessionTerminationReason.TOKEN_REUSE);
       await client.query('COMMIT');
       throw new AuthenticationFailedError();
     }
