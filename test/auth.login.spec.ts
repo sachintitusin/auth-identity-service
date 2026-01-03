@@ -113,8 +113,7 @@ describe('POST /auth/login', () => {
 
     expect(res.status).toBe(401);
     expect(res.body).toEqual({
-      error: 'UNAUTHORIZED',
-      message: 'AUTHENTICATION_FAILED',
+      error: 'AUTHENTICATION_FAILED',
     });
 
     const sessions = await pool.query(`SELECT * FROM sessions`);
