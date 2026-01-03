@@ -6,6 +6,8 @@ import {
   revokeSessionAndTokens,
   updateSessionTokenIssuedAt,
 } from '../repos/refresh-tokens.repo';
+import { AuthenticationFailedError } from '../errors';
+
 
 
 function hashRefreshToken(rawToken: string): Buffer {
@@ -22,9 +24,9 @@ export async function refreshSessionTokens(rawRefreshToken: string) {
 
     const tokenRecord = await findRefreshTokenByHash(client, hashedToken);
 
-    // Missing token → fail closed
+    // Missing token → authentication failure
     if (!tokenRecord) {
-      throw new Error('AUTHENTICATION_FAILED');
+      throw new AuthenticationFailedError();
     }
 
     const {
@@ -47,7 +49,7 @@ export async function refreshSessionTokens(rawRefreshToken: string) {
       // Enforce INV-TOKEN-3
       await revokeSessionAndTokens(client, sessionId);
       await client.query('COMMIT');
-      throw new Error('AUTHENTICATION_FAILED');
+      throw new AuthenticationFailedError();
     }
 
     const { rawRefreshToken: newRawRefreshToken } =
