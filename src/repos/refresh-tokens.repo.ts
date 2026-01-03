@@ -3,12 +3,21 @@ import { randomUUID, randomBytes, createHash } from 'crypto';
 
 /**
  * Fetch refresh token record by hashed token.
- * No validation or interpretation here.
+ * No validation or interpretation here. Concurrency protection is provided
+ * 1. If request A and B comes concurrently
+ * 2. A selects the token, the row gets locked
+ * 3. A successfully refreshes token
+ * 4. row gets unlocked
+ * 5. B tries to refresh the token
+ * 6. Reuse detected, revokes the session
  */
 export async function findRefreshTokenByHash(
   client: PoolClient,
   hashedToken: Buffer
 ) {
+  // The FOR UPDATE statement was added to ensure that the selected row in refresh_tokens (not in joining tables)
+  // is locked while doing this transaction. So if a race condition occurs, for instance a concurrent request
+  // comes to refresh the same token, it will be rejected. Thereby we prevent multiple tokens being issued.
   const res = await client.query(
     `
     SELECT
@@ -23,6 +32,7 @@ export async function findRefreshTokenByHash(
     JOIN sessions s ON s.id = rt.session_id
     JOIN identities i ON i.id = s.identity_id
     WHERE rt.hashed_token = $1
+    FOR UPDATE
     LIMIT 1
     `,
     [hashedToken]
