@@ -42,3 +42,12 @@ export class RegistrationFailedError extends AppError {
     super('REGISTRATION_FAILED');
   }
 }
+
+export class AuthenticationFailedError extends AppError {
+  statusCode = 401;
+  errorCode = 'AUTHENTICATION_FAILED';
+
+  constructor() {
+    super('AUTHENTICATION_FAILED');
+  }
+}
