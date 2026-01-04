@@ -15,7 +15,7 @@ export function authenticateAccessToken(
   const authHeader = req.header('Authorization');
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new UnauthorizedError("AUTHENTICATION FAILED");
+    throw new UnauthorizedError();
   }
 
   const token = authHeader.slice('Bearer '.length);
@@ -32,18 +32,17 @@ export function authenticateAccessToken(
       }
     ) as AccessTokenPayload;
   } catch {
-    throw new UnauthorizedError("AUTHENTICATION FAILED");
+    throw new UnauthorizedError();
   }
 
   if (!payload.sub || !payload.sid) {
     // Defensive: malformed token
-    throw new UnauthorizedError("AUTHENTICATION FAILED");
+    throw new UnauthorizedError();
   }
 
   // Inject authenticated context
-  (req as any).identityId = payload.sub;
-  (req as any).sessionId = payload.sid;
-  (req as any).identityId = payload.sub;
+  (req as any).sessionIdentifier = payload.sid;
+  (req as any).identitySubject = payload.sub;
 
   next();
 }
