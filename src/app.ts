@@ -15,6 +15,8 @@ import { loginSchema } from './schemas/login.schema';
 import cookieParser from 'cookie-parser';
 import { authenticateAccessToken } from './middleware/authenticate-access-token';
 import { logoutAllSessions } from './sessions.logout.all';
+import { changePassword } from './auth.password.change';
+import { changePasswordSchema } from './schemas/auth.password.change.schema';
 
 
 export const app = express();
@@ -79,6 +81,10 @@ app.delete(
   authenticateAccessToken,
   logoutAllSessions
 );
-
-
+app.put(
+  '/auth/password',
+  validateBody(changePasswordSchema),   // 400 BAD_REQUEST
+  authenticateAccessToken,          // 401 UNAUTHORIZED
+  changePassword                    // 204 / AUTH_FAILED
+);
 app.use(errorHandler);
