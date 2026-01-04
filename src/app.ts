@@ -18,6 +18,14 @@ import { logoutAllSessions } from './handlers/sessions.logout.all';
 import { changePassword } from './handlers/auth.password.change';
 import { changePasswordSchema } from './schemas/auth.password.change.schema';
 
+import {
+  initiateEmailVerificationHandler,
+} from './handlers/verifications.email';
+import {
+  confirmEmailVerificationHandler,
+} from './handlers/verifications.email.confirm';
+
+
 
 export const app = express();
 
@@ -87,4 +95,10 @@ app.put(
   authenticateAccessToken,          // 401 UNAUTHORIZED
   changePassword                    // 204 / AUTH_FAILED
 );
+
+app.post('/verifications/email', initiateEmailVerificationHandler);
+app.post('/verifications/email/confirm', confirmEmailVerificationHandler);
+
+
 app.use(errorHandler);
+
