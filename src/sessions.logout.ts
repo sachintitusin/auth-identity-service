@@ -7,11 +7,11 @@ import { UnauthorizedError } from './errors';
 
 export async function logoutCurrentSession(req: Request, res: Response) {
 
-    if (!(req as any).sessionId) {
-        throw new UnauthorizedError("AUTHENTICATION_FAILED");
+    if (!req.sessionIdentifier) {
+        throw new UnauthorizedError();
     }
   // sessionId must come from authenticated context
-  const sessionId = (req as any).sessionId;
+  const sessionId = req.sessionIdentifier;
 
 
   const client = await pool.connect();

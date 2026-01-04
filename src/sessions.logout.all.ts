@@ -6,7 +6,7 @@ export async function logoutAllSessions(
   req: Request,
   res: Response
 ) {
-  const subjectId = (req as any).identityId; // this is subject_id
+  const subjectId = req.identitySubject; // this is subject_id
 
   const client = await pool.connect();
 
