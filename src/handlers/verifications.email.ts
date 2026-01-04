@@ -37,7 +37,6 @@ export async function initiateEmailVerificationHandler(
     const verificationLink =
       `${process.env.APP_BASE_URL}/verify-email?token=${intent.rawToken}`;
 
-      console.log('[DEV] Verification link:', verificationLink);
 
     // Fire-and-forget — never block the request
     emailService.sendVerificationEmail({
