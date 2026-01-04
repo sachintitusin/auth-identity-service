@@ -1,9 +1,9 @@
 // src/sessions.logout.ts
 import { Request, Response } from 'express';
-import { pool } from './db';
-import { revokeSessionAndTokens } from './repos/refresh-tokens.repo';
-import { SessionTerminationReason } from './domain/session-termination-reason';
-import { UnauthorizedError } from './errors';
+import { pool } from '../db';
+import { revokeSessionAndTokens } from '../repos/refresh-tokens.repo';
+import { SessionTerminationReason } from '../domain/session-termination-reason';
+import { UnauthorizedError } from '../errors';
 
 export async function logoutCurrentSession(req: Request, res: Response) {
 

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import { refreshSessionTokens } from './domain/refresh-tokens.service';
-import { issueAccessToken } from './domain/access-token.service';
-import { AuthenticationFailedError } from './errors';
+import { refreshSessionTokens } from '../domain/refresh-tokens.service';
+import { issueAccessToken } from '../domain/access-token.service';
+import { AuthenticationFailedError } from '../errors';
 
 
 /**

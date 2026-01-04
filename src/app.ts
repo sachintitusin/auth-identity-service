@@ -4,18 +4,18 @@ import { pool } from './db';
 import { requestIdMiddleware } from './request-id';
 import { errorHandler } from './error-handler';
 
-import { register } from './auth.register';
-import { login } from './auth.login';
+import { register } from './handlers/auth.register';
+import { login } from './handlers/auth.login';
 
 import { validateBody } from './middleware/validate';
 import { registerSchema } from './schemas/register.schema';
-import { logoutCurrentSession } from './sessions.logout';
-import { refreshTokens } from './tokens.refresh';
+import { logoutCurrentSession } from './handlers/sessions.logout';
+import { refreshTokens } from './handlers/tokens.refresh';
 import { loginSchema } from './schemas/login.schema';
 import cookieParser from 'cookie-parser';
 import { authenticateAccessToken } from './middleware/authenticate-access-token';
-import { logoutAllSessions } from './sessions.logout.all';
-import { changePassword } from './auth.password.change';
+import { logoutAllSessions } from './handlers/sessions.logout.all';
+import { changePassword } from './handlers/auth.password.change';
 import { changePasswordSchema } from './schemas/auth.password.change.schema';
 
 

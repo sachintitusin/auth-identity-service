@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import { pool } from './db';
-import { rotatePasswordForSubject } from './domain/password-rotation.service';
-import { AuthenticationFailedError, UnauthorizedError } from './errors';
+import { pool } from '../db';
+import { rotatePasswordForSubject } from '../domain/password-rotation.service';
+import { AuthenticationFailedError, UnauthorizedError } from '../errors';
 
 export async function changePassword(req: Request, res: Response) {
   const identitySubject = req.identitySubject;

@@ -1,8 +1,8 @@
-import { pool } from './db';
+import { pool } from '../db';
 import { randomUUID, randomBytes, createHash } from 'crypto';
 import bcrypt from 'bcrypt';
 import { Request, Response } from 'express';
-import { RegistrationFailedError } from './errors';
+import { RegistrationFailedError } from '../errors';
 
 export async function register(req: Request, res: Response) {
   const { email, password } = req.body;

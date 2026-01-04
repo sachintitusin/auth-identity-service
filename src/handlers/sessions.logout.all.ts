@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { pool } from './db';
-import { revokeAllSessionsForIdentity } from './repos/refresh-tokens.repo';
+import { pool } from '../db';
+import { revokeAllSessionsForIdentity } from '../repos/refresh-tokens.repo';
 
 export async function logoutAllSessions(
   req: Request,

@@ -1,9 +1,9 @@
 import { Request} from 'express';
-import { pool } from './db';
+import { pool } from '../db';
 import { randomUUID } from 'crypto';
 import bcrypt from 'bcrypt';
-import { createRefreshToken } from './repos/refresh-tokens.repo';
-import { AuthenticationFailedError } from './errors';
+import { createRefreshToken } from '../repos/refresh-tokens.repo';
+import { AuthenticationFailedError } from '../errors';
 
 
 export type LoginResult = {
