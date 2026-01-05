@@ -23,6 +23,7 @@
   },
   "homepage": "https://github.com/sachintitusin/identity-service#readme",
   "dependencies": {
+    "@aws-sdk/client-sqs": "^3.962.0",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.2.3",
