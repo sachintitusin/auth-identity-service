@@ -1,10 +1,8 @@
-import { Request} from 'express';
+import { Request } from 'express';
 import { pool } from '../db';
-import { randomUUID } from 'crypto';
 import bcrypt from 'bcrypt';
-import { createRefreshToken } from '../repos/refresh-tokens.repo';
 import { AuthenticationFailedError } from '../errors';
-
+import { createSessionWithRefreshToken } from '../domain/session-creation.service';
 
 export type LoginResult = {
   session: {
@@ -37,7 +35,7 @@ export async function login(req: Request): Promise<LoginResult> {
 
     const { identity_id } = identifierResult.rows[0];
 
-    // ---- 2. Resolve credential (password) ----
+    // ---- 2. Resolve active password credential ----
     const credentialResult = await client.query(
       `
       SELECT id
@@ -55,7 +53,7 @@ export async function login(req: Request): Promise<LoginResult> {
 
     const credentialId = credentialResult.rows[0].id;
 
-    // ---- 3. Load password credential ----
+    // ---- 3. Load password hash ----
     const passwordResult = await client.query(
       `
       SELECT password_hash
@@ -66,58 +64,36 @@ export async function login(req: Request): Promise<LoginResult> {
     );
 
     if (passwordResult.rowCount === 0) {
-      // Defensive: should never happen if invariants hold
       throw new AuthenticationFailedError();
     }
 
     const { password_hash } = passwordResult.rows[0];
 
-    // ---- 4. Verify password (always run bcrypt) ----
+    // ---- 4. Verify password ----
     const passwordMatches = await bcrypt.compare(password, password_hash);
 
     if (!passwordMatches) {
       throw new AuthenticationFailedError();
     }
 
-    // ---- 5. Create session + refresh token (transactional) ----
+    // ---- 5. Create session (delegated to domain) ----
     await client.query('BEGIN');
 
-    const sessionId = randomUUID();
-    const sessionIdentifier = randomUUID();
-
-    await client.query(
-      `
-      INSERT INTO sessions (
-        id,
-        identity_id,
-        session_identifier
-      ) VALUES ($1, $2, $3)
-      `,
-      [sessionId, identity_id, sessionIdentifier]
-    );
-
-    const { rawRefreshToken } = await createRefreshToken(client, {
-      sessionId,
+    const session = await createSessionWithRefreshToken(client, {
+      identityId: identity_id,
     });
 
     await client.query('COMMIT');
 
-    // ---- 6. Success response ----
-    // This is not returned to the client. The router captures it and transforms accordingly
-    // This is to ensure that the controller doesn't decide the response transport policy
-    // It is done by route here
     return {
       session: {
-        id: sessionIdentifier,
+        id: session.sessionIdentifier,
       },
-      // the _ before _refreshToken means it is for internal use only
-      _refreshToken: rawRefreshToken,
+      _refreshToken: session.refreshToken,
     };
   } catch (err) {
     await client.query('ROLLBACK');
-
-    // Collapse all auth failures intentionally
-    throw err
+    throw err;
   } finally {
     client.release();
   }
