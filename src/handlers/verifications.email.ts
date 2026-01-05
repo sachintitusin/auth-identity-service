@@ -24,7 +24,6 @@ export async function initiateEmailVerificationHandler(
   } finally {
     client.release();
   }
-  console.log("intent found")
   // ---- SIDE EFFECT (after commit) ----
   if (intent) {
     /**
