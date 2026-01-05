@@ -3,16 +3,21 @@ import { randomUUID, randomBytes, createHash } from 'crypto';
 import bcrypt from 'bcrypt';
 import { Request, Response } from 'express';
 import { RegistrationFailedError } from '../errors';
+import { getEmailService } from '../infra/email';
 
 export async function register(req: Request, res: Response) {
   const { email, password } = req.body;
 
   const client = await pool.connect();
 
+  // We need rawToken AFTER commit, so keep it outside
+  let rawTokenForEmail: string | null = null;
+  let verificationExpiresAt: Date | null = null;
+
   try {
     await client.query('BEGIN');
 
-    // ---- IDs (explicit, deterministic) ----
+    // ---- IDs ----
     const identityId = randomUUID();
     const subjectId = randomUUID();
     const identifierId = randomUUID();
@@ -28,7 +33,7 @@ export async function register(req: Request, res: Response) {
       [identityId, subjectId]
     );
 
-    // ---- 2. Identity Identifier (email, unverified) ----
+    // ---- 2. Identity Identifier ----
     await client.query(
       `
       INSERT INTO identity_identifiers (
@@ -42,7 +47,7 @@ export async function register(req: Request, res: Response) {
       [identifierId, identityId, email]
     );
 
-    // ---- 3. Credential (password) ----
+    // ---- 3. Credential ----
     await client.query(
       `
       INSERT INTO credentials (
@@ -54,7 +59,7 @@ export async function register(req: Request, res: Response) {
       [credentialId, identityId]
     );
 
-    // ---- 4. Password Credential (secret implementation) ----
+    // ---- 4. Password Credential ----
     const passwordHash = await bcrypt.hash(password, 12);
 
     await client.query(
@@ -69,11 +74,13 @@ export async function register(req: Request, res: Response) {
       [credentialId, identifierId, passwordHash]
     );
 
-    // ---- 5. Email Verification (token-based, hashed) ----
-    const rawToken = randomBytes(32); // NEVER stored
+    // ---- 5. Email Verification ----
+    const rawToken = randomBytes(32).toString('base64url');
     const hashedToken = createHash('sha256')
       .update(rawToken)
-      .digest(); // BYTEA
+      .digest();
+
+    verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     await client.query(
       `
@@ -83,24 +90,36 @@ export async function register(req: Request, res: Response) {
         verification_type,
         hashed_token,
         expires_at
-      ) VALUES ($1, $2, 'email', $3, now() + interval '24 hours')
+      ) VALUES ($1, $2, 'email', $3, $4)
       `,
-      [verificationId, identityId, hashedToken]
+      [verificationId, identityId, hashedToken, verificationExpiresAt]
     );
 
+    // Save for AFTER commit
+    rawTokenForEmail = rawToken;
+
     await client.query('COMMIT');
-
-    // IMPORTANT:
-    // rawToken is intentionally NOT returned here.
-    // It is meant for downstream email delivery / outbox later.
-
-    return res.status(201).json({ status: 'ok' });
   } catch (err) {
     await client.query('ROLLBACK');
-
-    // Collapse ALL failures (including duplicate email)
     throw new RegistrationFailedError();
   } finally {
     client.release();
   }
+
+  // ---- 6. Email delivery (OUTSIDE transaction) ----
+  if (rawTokenForEmail && verificationExpiresAt) {
+    const emailService = getEmailService();
+
+    // Best-effort: do NOT let this throw
+    emailService.sendVerificationEmail({
+      to: email,
+      verificationLink: `${process.env.FRONTEND_BASE_URL}/verify-email?token=${rawTokenForEmail}`,
+      expiresAt: verificationExpiresAt,
+    }).catch(() => {
+      // intentionally swallowed
+      // optional: structured log / metric
+    });
+  }
+
+  return res.status(201).json({ status: 'ok' });
 }
