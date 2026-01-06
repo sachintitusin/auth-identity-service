@@ -1,12 +1,13 @@
 import { Request, Response } from 'express';
 import { pool } from '../db';
-import { revokeAllSessionsForIdentity } from '../repos/refresh-tokens.repo';
+import { terminateIdentitySessions } from '../domain/identity-session-termination.service';
+import { SessionTerminationReason } from '../domain/session-termination-reason';
 
 export async function logoutAllSessions(
   req: Request,
   res: Response
 ) {
-  const subjectId = req.identitySubject; // this is subject_id
+  const subjectId = req.identitySubject; // subject_id from auth context
 
   const client = await pool.connect();
 
@@ -32,11 +33,10 @@ export async function logoutAllSessions(
 
     const identityId = identityRes.rows[0].id;
 
-    await revokeAllSessionsForIdentity(
-      client,
+    await terminateIdentitySessions(client, {
       identityId,
-      'USER_LOGOUT'
-    );
+      reason: SessionTerminationReason.USER_LOGOUT,
+    });
 
     await client.query('COMMIT');
     return res.status(204).send();

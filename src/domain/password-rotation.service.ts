@@ -16,13 +16,19 @@ import { revokeAllSessionsForIdentity } from '../repos/refresh-tokens.repo';
 import { AuthenticationFailedError } from '../errors';
 import { SessionTerminationReason } from './session-termination-reason';
 
+import { emitAuditEvent } from './audit/audit.service';
+import { AuditEventType } from './audit/audit.types';
+
 /**
  * Rotate (change) password for an identity (subject-based).
  *
  * Security semantics:
- * - JWT subject is resolved to internal identity_id
- * - All failures collapse to AUTHENTICATION_FAILED
+ * - Subject resolves to internal identity_id
+ * - All failures collapse to AuthenticationFailedError
  * - Credential rotation + global session revocation is mandatory
+ * - Audit is emitted ONLY on full success
+ *
+ * Must be executed inside an existing transaction.
  */
 export async function rotatePasswordForSubject(
   client: PoolClient,
@@ -34,7 +40,7 @@ export async function rotatePasswordForSubject(
 ): Promise<void> {
   const { identitySubject, currentPassword, newPassword } = params;
 
-  // ---- Step 0: Resolve subject → internal identity_id ----
+  // ---- Step 0: Resolve subject → identity_id ----
   const identityRes = await client.query(
     `
     SELECT id
@@ -72,7 +78,7 @@ export async function rotatePasswordForSubject(
     throw new AuthenticationFailedError();
   }
 
-  // ---- Step 3: Verify current password (CPU-bound) ----
+  // ---- Step 3: Verify current password ----
   const passwordMatches = await bcrypt.compare(
     currentPassword,
     secret.passwordHash
@@ -97,10 +103,27 @@ export async function rotatePasswordForSubject(
     hashAlgorithm: 'bcrypt',
   });
 
-  // ---- Step 5: Invalidate all sessions + refresh tokens ----
+  // ---- Step 5: Revoke all sessions ----
   await revokeAllSessionsForIdentity(
     client,
     identityId,
     SessionTerminationReason.PASSWORD_CHANGE
   );
+
+  // ---- Step 6: Emit audit event (SUCCESS ONLY) ----
+  await emitAuditEvent({
+    eventType: AuditEventType.PASSWORD_CREDENTIAL_ROTATED,
+    actor: {
+      type: 'identity',
+      id: identityId,
+    },
+    target: {
+      type: 'identity',
+      id: identityId,
+    },
+    metadata: {
+      session_revocation: 'all',
+      rotation_reason: 'user_initiated',
+    },
+  });
 }

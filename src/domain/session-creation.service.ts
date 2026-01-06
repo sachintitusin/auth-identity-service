@@ -1,6 +1,8 @@
 import { PoolClient } from 'pg';
 import { randomUUID } from 'crypto';
 import { createRefreshToken } from '../repos/refresh-tokens.repo';
+import { AuditEventType } from './audit/audit.types';
+import { emitAuditEvent } from './audit/audit.service';
 
 /**
  * Create a new authenticated session and issue
@@ -55,6 +57,21 @@ export async function createSessionWithRefreshToken(
   // ---- 2. Issue initial refresh token ----
   const { rawRefreshToken } = await createRefreshToken(client, {
     sessionId,
+  });
+
+  await emitAuditEvent({
+    eventType: AuditEventType.SESSION_CREATED,
+    actor: {
+      type: 'identity',
+      id: params.identityId,
+    },
+    target: {
+      type: 'session',
+      id: sessionId,
+    },
+    metadata: {
+      auth_method: 'password', // or 'oauth'
+    },
   });
 
   return {

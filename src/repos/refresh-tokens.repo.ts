@@ -128,11 +128,10 @@ export async function createRefreshToken(
  * Revoke an entire session and all associated refresh tokens.
  * Used for logout and token-reuse security events.
  */
-export async function revokeSessionAndTokens(
+export async function revokeRefreshTokensForSession(
   client: PoolClient,
-  sessionId: string,
-  reason: 'USER_LOGOUT' | 'TOKEN_REUSE' | 'PASSWORD_CHANGE' | 'ADMIN_REVOCATION'
-) {
+  sessionId: string
+): Promise<void> {
   await client.query(
     `
     UPDATE refresh_tokens
@@ -142,19 +141,8 @@ export async function revokeSessionAndTokens(
     `,
     [sessionId]
   );
-
-  await client.query(
-    `
-    UPDATE sessions
-    SET
-      terminated_at = now(),
-      termination_reason = $2
-    WHERE id = $1
-      AND terminated_at IS NULL
-    `,
-    [sessionId, reason]
-  );
 }
+
 
 /**
  * Observational only — never used for authorization.

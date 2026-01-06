@@ -1,5 +1,5 @@
 import { PoolClient } from 'pg';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 
 import { generateOpaqueToken } from '../security/opaque-token';
 import { TOKEN_ENTROPY } from '../security/token-policy';
@@ -17,7 +17,14 @@ import {
   markVerificationUsed,
 } from '../repos/verifications.repo';
 
+import { emitAuditEvent } from './audit/audit.service';
+import { AuditEventType } from './audit/audit.types';
 
+/**
+ * Initiate email verification.
+ *
+ * Silent, idempotent, non-observable.
+ */
 export async function initiateEmailVerification(
   client: PoolClient,
   params: {
@@ -31,70 +38,91 @@ export async function initiateEmailVerification(
     }
   | null
 > {
-    // 1. Resolve identifier silently
-    const identifier = await findIdentityIdentifier(client, {
-        type: 'email',
-        value: params.email,
-    });
-    // Identity or identifier does not exist → silent no-op
-    if (!identifier) {
-      return null;
-    }
-    // Email already verified → nothing to do
-    if (identifier.verified_at) {
-      return null;
-    }
-    // 2. Invalidate any existing active verification (idempotent)
-    await invalidateActiveVerification(client, {
-      identityId: identifier.identity_id,
-      verificationType: 'email',
-    });
-    // 3. Generate new verification token
-    const { raw, hash } = generateOpaqueToken(
-      TOKEN_ENTROPY.EMAIL_VERIFICATION_BYTES
-    );
+  // 1. Resolve identifier silently
+  const identifier = await findIdentityIdentifier(client, {
+    type: 'email',
+    value: params.email,
+  });
 
-    const verificationId = randomUUID();
+  // Identity or identifier does not exist → silent no-op
+  if (!identifier) {
+    return null;
+  }
 
-    // Verification expiry (policy decision lives here)
-    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24 hours
+  // Email already verified → nothing to do
+  if (identifier.verified_at) {
+    return null;
+  }
 
-    // 4. Persist verification record
-    await createEmailVerification(client, {
-      verificationId,
-      identityId: identifier.identity_id,
-      verificationType: 'email',
-      hashedToken: hash,
-      expiresAt,
-    });
+  // 2. Invalidate any existing active verification (idempotent)
+  await invalidateActiveVerification(client, {
+    identityId: identifier.identity_id,
+    verificationType: 'email',
+  });
 
-    // 5. Return verification intent (caller decides delivery)
-    return {
-      email: identifier.value,
-      rawToken: raw,
-      expiresAt,
-    };
+  // 3. Generate new verification token
+  const { raw, hash } = generateOpaqueToken(
+    TOKEN_ENTROPY.EMAIL_VERIFICATION_BYTES
+  );
+
+  const verificationId = randomUUID();
+
+  // Verification expiry (policy decision lives here)
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24 hours
+
+  // 4. Persist verification record
+  await createEmailVerification(client, {
+    verificationId,
+    identityId: identifier.identity_id,
+    verificationType: 'email',
+    hashedToken: hash,
+    expiresAt,
+  });
+
+  // 🔍 Audit: verification token issued
+  await emitAuditEvent({
+    eventType: AuditEventType.VERIFICATION_TOKEN_ISSUED,
+    actor: {
+      type: 'system',
+      id: null,
+    },
+    target: {
+      type: 'verification',
+      id: verificationId,
+    },
+    metadata: {
+      verification_type: 'email',
+      expires_at: expiresAt.toISOString(),
+    },
+  });
+
+  // 5. Return verification intent (caller decides delivery)
+  return {
+    email: identifier.value,
+    rawToken: raw,
+    expiresAt,
+  };
 }
 
+/**
+ * Confirm email verification.
+ *
+ * Silent, idempotent, non-observable.
+ */
 export async function confirmEmailVerification(
   client: PoolClient,
   params: {
     rawToken: string;
   }
 ): Promise<void> {
-
   if (!params.rawToken || typeof params.rawToken !== 'string') {
     return;
   }
 
   // 1. Hash the raw token (raw token is never persisted)
-  
-  const hashedToken = Buffer.from(
-    require('crypto')
-      .createHash('sha256')
-      .update(params.rawToken)
-      .digest()
-  );
+  const hashedToken = createHash('sha256')
+    .update(params.rawToken)
+    .digest();
 
   // 2. Resolve verification record with row-level lock
   const verification = await findVerificationByHashedToken(
@@ -107,9 +135,9 @@ export async function confirmEmailVerification(
     return;
   }
 
-  // 3. Validate verification state (all silent)
   const now = new Date();
 
+  // 3. Validate verification state (all silent)
   if (verification.used_at) {
     return;
   }
@@ -137,4 +165,20 @@ export async function confirmEmailVerification(
   }
 
   await markIdentifierVerified(client, identifier.id);
+
+  // 🔍 Audit: email verified
+  await emitAuditEvent({
+    eventType: AuditEventType.EMAIL_VERIFIED,
+    actor: {
+      type: 'identity',
+      id: verification.identity_id,
+    },
+    target: {
+      type: 'identity',
+      id: verification.identity_id,
+    },
+    metadata: {
+      identifier_type: 'email',
+    },
+  });
 }

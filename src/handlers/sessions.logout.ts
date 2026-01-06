@@ -1,31 +1,27 @@
 // src/sessions.logout.ts
 import { Request, Response } from 'express';
 import { pool } from '../db';
-import { revokeSessionAndTokens } from '../repos/refresh-tokens.repo';
+import { terminateSessionAndTokens } from '../domain/session-termination.service';
 import { SessionTerminationReason } from '../domain/session-termination-reason';
 import { UnauthorizedError } from '../errors';
 
 export async function logoutCurrentSession(req: Request, res: Response) {
+  if (!req.sessionIdentifier) {
+    throw new UnauthorizedError();
+  }
 
-    if (!req.sessionIdentifier) {
-        throw new UnauthorizedError();
-    }
   // sessionId must come from authenticated context
   const sessionId = req.sessionIdentifier;
-
 
   const client = await pool.connect();
 
   try {
     await client.query('BEGIN');
 
-    // the current session gets marked as revoked
-    // associated tokens get revoked
-    await revokeSessionAndTokens(
-      client,
+    await terminateSessionAndTokens(client, {
       sessionId,
-      SessionTerminationReason.USER_LOGOUT
-    );
+      reason: SessionTerminationReason.USER_LOGOUT,
+    });
 
     await client.query('COMMIT');
 

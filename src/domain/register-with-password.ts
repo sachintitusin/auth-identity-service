@@ -1,10 +1,12 @@
 // src/domain/registration/register-with-password.ts
 
 import { PoolClient } from 'pg';
-import { randomBytes, createHash } from 'crypto';
+import { randomBytes, createHash, randomUUID } from 'crypto';
 import bcrypt from 'bcrypt';
 
 import { createIdentity } from '../repos/identities.repo';
+import { emitAuditEvent } from './audit/audit.service';
+import { AuditEventType } from './audit/audit.types';
 
 export async function registerWithPassword(
   client: PoolClient,
@@ -22,8 +24,20 @@ export async function registerWithPassword(
   // ---- 1. Create identity ----
   const identity = await createIdentity(client);
 
+  await emitAuditEvent({
+    eventType: AuditEventType.IDENTITY_CREATED,
+    actor: {
+      type: 'system',
+      id: null,
+    },
+    target: {
+      type: 'identity',
+      id: identity.id,
+    },
+  });
+
   // ---- 2. Create email identifier (unverified) ----
-  const identifierId = crypto.randomUUID();
+  const identifierId = randomUUID();
 
   await client.query(
     `
@@ -39,7 +53,7 @@ export async function registerWithPassword(
   );
 
   // ---- 3. Create password credential ----
-  const credentialId = crypto.randomUUID();
+  const credentialId = randomUUID();
   const passwordHash = await bcrypt.hash(params.password, 12);
 
   await client.query(
@@ -81,8 +95,23 @@ export async function registerWithPassword(
       expires_at
     ) VALUES ($1, $2, 'email', $3, $4)
     `,
-    [crypto.randomUUID(), identity.id, hashedToken, expiresAt]
+    [randomUUID(), identity.id, hashedToken, expiresAt]
   );
+
+  await emitAuditEvent({
+    eventType: AuditEventType.VERIFICATION_TOKEN_ISSUED,
+    actor: {
+      type: 'system',
+      id: null,
+    },
+    target: {
+      type: 'identity',
+      id: identity.id,
+    },
+    metadata: {
+      verification_type: 'email',
+    },
+  });
 
   return {
     identityId: identity.id,
