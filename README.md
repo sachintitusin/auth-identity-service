@@ -93,67 +93,93 @@ Service Principal  → ROOT
 
 ---
 
-## Authentication Model (High Level)
-
-- **Login**
-  - Verifies credentials
-  - Creates a session
-  - Issues a refresh token
-  - Does *not* issue access tokens
-
-- **Token Refresh**
-  - Validates refresh token
-  - Detects reuse
-  - Rotates refresh token
-  - Issues access token
-
-- **Logout**
-  - Per-session or global
-  - Irreversible
-
----
-
-## Public API Philosophy
-
-Public APIs are **orchestration facades**, not domain primitives.
-
-They:
-- represent user intent
-- compose multiple invariant-enforced operations
-- are atomic
-- collapse failure modes intentionally
-
-The frontend never coordinates identity, session, or token lifecycles.
-
----
-
-## Documentation (Start Here)
+## Documentation (Recommended Reading Order)
 
 This repository is intentionally **documented from first principles**.
 
-If you want to understand *why* the system works the way it does,
-start with the `/docs` directory:
+1. [Trust Boundaries](docs/trust-boundaries.md)
+2. [Threat Model](docs/threat-model.md)
+3. [Domain Invariants](docs/domain-invariants.md)
+4. [Public APIs](docs/public-apis.md)
+5. [Database Design](docs/database-design.md)
+6. [Testing Strategy](docs/testing-strategy.md)
+7. [OpenAPI Specification](docs/openapi.yaml)
 
-### Suggested Reading Order
-
-1. **Trust Boundaries** — where assumptions stop  
-2. **Threat Model** — what the system is designed to survive  
-3. **Domain Invariants** — rules that must never break  
-4. **Public APIs** — user-facing workflows & guarantees  
-5. **Database Design** — how invariants are enforced at persistence  
-6. **Testing Strategy** — how non-observable behavior is validated  
+> Behavioral guarantees and security semantics are defined in the design documents above.  
+> The OpenAPI specification describes request/response **shape only**.
 
 ---
 
-## Testing Philosophy
+## Getting the App Running (For Testing & Exploration)
 
-Authentication correctness is often **intentionally non-observable**.
+### Prerequisites
 
-This project uses:
-- **HTTP contract tests** to assert what clients can observe
-- **Domain-level tests** to validate invariant enforcement and silent behavior
+- Node.js (LTS)
+- PostgreSQL
+- npm or pnpm
 
-Tests avoid asserting on behavior that is intentionally hidden for security reasons.
+### Setup
+
+```bash
+git clone <repo-url>
+cd <repo>
+npm install
+```
+
+### Environment Configuration
+
+Create a `.env` file:
+
+```env
+DATABASE_URL=postgres://user:password@localhost:5432/auth_db
+JWT_SECRET=dev-secret
+```
+
+### Database
+
+```bash
+npm run migrate
+```
+
+### Start the Server
+
+```bash
+npm run dev
+```
+
+API available at `http://localhost:3000`
+
+---
+
+## Testing
+
+```bash
+npm test
+```
+
+Tests use a real PostgreSQL database and validate both
+HTTP contracts and domain-level invariants.
+
+---
+
+## Infrastructure & Extensibility Notes
+
+Email delivery is intentionally treated as **outside the authentication security boundary**.
+
+The system is designed to support **asynchronous delivery pipelines** for verification
+and notification emails. In a production deployment, this can be backed by:
+
+- AWS SQS
+- Redis-backed queues
+- Other message brokers
+
+Queue-backed delivery ensures that:
+- authentication correctness does not depend on email latency or availability
+- verification workflows remain non-blocking
+- transient infrastructure failures do not affect auth invariants
+
+The boundary between authentication logic and delivery infrastructure
+is explicit and replaceable by design.
 
 ---
 
@@ -163,21 +189,6 @@ Tests avoid asserting on behavior that is intentionally hidden for security reas
 - Not a complete IAM solution
 - Not UI-focused
 - Not production-scaled infrastructure
-
-This is a **reference implementation and learning project**,
-built to demonstrate system-level reasoning about authentication.
-
----
-
-## Tech Stack
-
-- **Runtime:** Node.js
-- **Framework:** Express
-- **Database:** PostgreSQL
-- **Tokens:** JWT (access), opaque refresh tokens
-- **Validation:** Zod
-- **Testing:** Jest + Supertest
-- **Persistence:** Real database (no auth-logic mocks)
 
 ---
 
@@ -190,5 +201,3 @@ That is the point.
 It reflects how authentication systems are designed, reviewed,
 and reasoned about in security-sensitive environments —
 with explicit guarantees, clear failure semantics, and defense in depth.
-
-Feedback, critique, and discussion are welcome.
