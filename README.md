@@ -1,146 +1,194 @@
-# Auth / Identity Service
+# Security-First Authentication & Identity Service
 
-A security-first, session-centric authentication and identity service designed for real-world production systems.
+An **invariant-driven, threat-modeled authentication system** designed around
+explicit identity, session, and token lifecycles.
 
-This project is not a “login API”.
-It is an auth platform built around trust boundaries, threat modeling, and explicit domain invariants.
-
-The goal is simple:
-
-Make insecure behavior impossible by design, not just unlikely by implementation.
+This project explores what authentication looks like when correctness,
+non-observability, and security guarantees are treated as first-class concerns —
+not framework defaults or afterthoughts.
 
 ---
 
-## Why this exists
+## Why This Project Exists
 
-Most authentication systems fail not because of bad crypto —
-they fail because of blurred responsibilities, implicit trust, and leaky abstractions.
+Most authentication systems evolve organically and fail in subtle but dangerous ways:
 
-This service explicitly avoids:
-- User enumeration
-- Token replay
-- Implicit session trust
-- Privilege escalation via OAuth
-- Frontend-managed security state
-- Long-lived or reusable tokens
+- token replay bugs
+- session resurrection
+- user enumeration via error messages
+- unsafe OAuth account linking
+- security logic split between frontend and backend
+- database states that *should never exist*
 
----
+This project was built to answer a different question:
 
-## Design Philosophy
+> **What if authentication were designed from invariants and threat models first,
+> and only then implemented?**
 
-The system is designed top-down:
-
-1. Trust Boundaries  
-2. Threat Model  
-3. Domain Invariants  
-4. API Contracts  
-5. Implementation  
-
-If a lower layer violates a higher one, the system is considered invalid — even if it works.
+The result is not a generic auth starter kit, but a **reference-grade authentication system**
+that prioritizes correctness, auditability, and security boundaries.
 
 ---
 
-## Core Concepts
+## What Makes This Different
 
-- Identity: Stable internal representation of a user or service
-- Credential: Authentication method (password, OAuth, etc.)
-- Session: Server-recognized authenticated context
-- Access Token: Short-lived, stateless authorization proof
-- Refresh Token: Single-use secret used to obtain access tokens
-- Verification: Proof of control over an attribute (email, phone)
+- **Session-first authentication model**  
+  Login creates a session; access tokens are issued *only* via refresh.
 
-Identity ≠ Credential ≠ Session ≠ Token
+- **Single-use refresh tokens with rotation & replay detection**  
+  Token reuse is treated as an active compromise.
 
----
+- **Non-observable failure behavior by design**  
+  Identity existence, verification state, and token validity are never leaked.
 
-## Security Invariants (Non-Negotiable)
+- **Explicit trust boundaries & threat modeling**  
+  Security decisions are intentional, not implicit.
 
-- Refresh tokens are single-use
-- Refresh token reuse is a security incident
-- Sessions are explicit and revocable
-- Access tokens are short-lived and stateless
-- Raw tokens are never stored or logged
-- Email verification is not authentication
-- Identity existence is not externally observable
-- Backend services are never implicitly trusted
-- Security failures fail closed
+- **Database as a security boundary**  
+  Invariants are enforced via constraints, partial indexes, and immutability.
+
+- **OAuth without email-based identity merging**  
+  External identities are bound strictly by `(provider, subject)`.
+
+- **Immutable audit logging**  
+  Security events are preserved for forensics without affecting auth behavior.
 
 ---
 
-## Token Model
+## Core Design Principles
 
-Login does NOT issue access tokens.
-
-Flow:
-- /auth/login → creates session + refresh token
-- /tokens/refresh → rotates refresh token + issues access token
-
-Refresh tokens are rotated on every use.
-Reuse triggers global session revocation.
+- Trust boundaries are explicit  
+- APIs represent **state transitions**, not actions  
+- Frontends never coordinate security invariants  
+- Authentication ≠ verification ≠ authorization  
+- Security failures fail closed  
+- Token delivery does not change token semantics  
 
 ---
 
-## API Surface
+## System Overview
 
-Public APIs (frontend-facing):
-- POST /register
-- POST /auth/login
-- POST /auth/oauth/{provider}
-- POST /tokens/refresh
-- DELETE /sessions/current
+### Core Concepts
 
-Domain APIs (internal only):
-- POST /identities
-- POST /credentials/password
-- POST /sessions
+- **Identity** — a stable representation of a person or system  
+- **Credential** — a method used to authenticate an identity  
+- **Session** — a server-recognized authenticated context  
+- **Access Token** — short-lived proof of authentication  
+- **Refresh Token** — single-use continuation capability  
+- **Verification** — proof of control over an attribute  
+- **Principal** — an authenticated user or service  
 
-Frontends never coordinate identity, credential, or session lifecycles.
+### Ownership Model
 
----
-
-## Database Design Highlights
-
-- Internal primary keys are never exposed
-- Stable public identifiers exist where required
-- Tokens are stored hashed only
-- Soft deletes preserve forensic integrity
-- Audit logs are immutable
-
----
-
-## What This System Does NOT Do
-
-- MFA
-- Password reset flows
-- Device fingerprinting
-- Rate limiting logic
-- UI or frontend code
-- Business-domain authorization
-
-These are layered on top, not mixed into the core.
+```
+Identity           → ROOT
+Credential         → OWNED BY Identity
+Session            → OWNED BY Identity
+Refresh Token      → OWNED BY Session
+Verification       → OWNED BY Identity
+External Identity  → OWNED BY Identity
+Audit Log          → ROOT
+Service Principal  → ROOT
+```
 
 ---
 
-## Technology (Replaceable)
+## Authentication Model (High Level)
 
-- Node.js / NestJS
-- PostgreSQL
-- JWT
-- Redis (optional)
-- Zod validation
+- **Login**
+  - Verifies credentials
+  - Creates a session
+  - Issues a refresh token
+  - Does *not* issue access tokens
 
-Security guarantees live above the framework layer.
+- **Token Refresh**
+  - Validates refresh token
+  - Detects reuse
+  - Rotates refresh token
+  - Issues access token
+
+- **Logout**
+  - Per-session or global
+  - Irreversible
 
 ---
 
-## Status
+## Public API Philosophy
 
-Active development.
+Public APIs are **orchestration facades**, not domain primitives.
 
-Architecture, invariants, contracts, and ADRs are stable.
-Features are added only if they preserve existing guarantees.
+They:
+- represent user intent
+- compose multiple invariant-enforced operations
+- are atomic
+- collapse failure modes intentionally
+
+The frontend never coordinates identity, session, or token lifecycles.
 
 ---
 
-This is a reference-quality auth system.
-If something feels strict or inconvenient — it is probably protecting you.
+## Documentation (Start Here)
+
+This repository is intentionally **documented from first principles**.
+
+If you want to understand *why* the system works the way it does,
+start with the `/docs` directory:
+
+### Suggested Reading Order
+
+1. **Trust Boundaries** — where assumptions stop  
+2. **Threat Model** — what the system is designed to survive  
+3. **Domain Invariants** — rules that must never break  
+4. **Public APIs** — user-facing workflows & guarantees  
+5. **Database Design** — how invariants are enforced at persistence  
+6. **Testing Strategy** — how non-observable behavior is validated  
+
+---
+
+## Testing Philosophy
+
+Authentication correctness is often **intentionally non-observable**.
+
+This project uses:
+- **HTTP contract tests** to assert what clients can observe
+- **Domain-level tests** to validate invariant enforcement and silent behavior
+
+Tests avoid asserting on behavior that is intentionally hidden for security reasons.
+
+---
+
+## What This Project Is NOT
+
+- Not a drop-in auth library
+- Not a complete IAM solution
+- Not UI-focused
+- Not production-scaled infrastructure
+
+This is a **reference implementation and learning project**,
+built to demonstrate system-level reasoning about authentication.
+
+---
+
+## Tech Stack
+
+- **Runtime:** Node.js
+- **Framework:** Express
+- **Database:** PostgreSQL
+- **Tokens:** JWT (access), opaque refresh tokens
+- **Validation:** Zod
+- **Testing:** Jest + Supertest
+- **Persistence:** Real database (no auth-logic mocks)
+
+---
+
+## Closing Note
+
+This project is intentionally **over-designed** for its size.
+
+That is the point.
+
+It reflects how authentication systems are designed, reviewed,
+and reasoned about in security-sensitive environments —
+with explicit guarantees, clear failure semantics, and defense in depth.
+
+Feedback, critique, and discussion are welcome.

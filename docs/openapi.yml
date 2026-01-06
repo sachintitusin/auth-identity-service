@@ -1,0 +1,231 @@
+openapi: 3.0.3
+info:
+  title: Auth / Identity Service – Public API
+  description: >
+    Public orchestration APIs for the Auth / Identity Service.
+    This specification describes request and response shapes only.
+    Behavioral guarantees, security semantics, and failure collapse
+    are defined in docs/public-apis.md and related design documents.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+tags:
+  - name: Registration
+  - name: Authentication
+  - name: OAuth
+  - name: Tokens
+  - name: Sessions
+  - name: Credentials
+  - name: Verification
+
+paths:
+  /register:
+    post:
+      tags: [Registration]
+      summary: Register with email and password
+      description: >
+        Creates a new identity using email and password.
+        Verification is initiated automatically.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        "204":
+          description: Request processed successfully.
+        "400":
+          description: Malformed request.
+
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login with email and password
+      description: >
+        Authenticates credentials and creates a new session.
+        Does not issue access tokens.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        "204":
+          description: Authentication processed.
+        "401":
+          description: Authentication failed.
+
+  /auth/oauth/{provider}:
+    post:
+      tags: [OAuth]
+      summary: OAuth login
+      description: >
+        Authenticates using an external identity provider.
+        Creates a session and issues a refresh token.
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OAuthCallbackRequest'
+      responses:
+        "204":
+          description: Authentication processed.
+        "401":
+          description: Authentication failed.
+
+  /tokens/refresh:
+    post:
+      tags: [Tokens]
+      summary: Refresh access token
+      description: >
+        Rotates refresh token and issues a new access token.
+        This is the only endpoint that issues access tokens.
+      security:
+        - refreshTokenCookie: []
+      responses:
+        "200":
+          description: Access token issued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessTokenResponse'
+        "401":
+          description: Authentication failed.
+
+  /auth/password:
+    put:
+      tags: [Credentials]
+      summary: Change password
+      description: >
+        Changes the password for the authenticated identity.
+        Revokes all active sessions.
+      security:
+        - accessToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordChangeRequest'
+      responses:
+        "204":
+          description: Password updated.
+        "401":
+          description: Authentication failed.
+
+  /sessions/current:
+    delete:
+      tags: [Sessions]
+      summary: Logout current session
+      description: Terminates the current authenticated session.
+      security:
+        - accessToken: []
+      responses:
+        "204":
+          description: Session terminated.
+
+  /sessions:
+    delete:
+      tags: [Sessions]
+      summary: Logout all sessions
+      description: Terminates all sessions for the authenticated identity.
+      security:
+        - accessToken: []
+      responses:
+        "204":
+          description: All sessions terminated.
+
+  /verifications/email:
+    post:
+      tags: [Verification]
+      summary: Initiate email verification
+      description: >
+        Initiates or re-initiates email verification.
+        Response is intentionally non-observable.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailVerificationRequest'
+      responses:
+        "204":
+          description: Request processed.
+
+components:
+  securitySchemes:
+    accessToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    refreshTokenCookie:
+      type: apiKey
+      in: cookie
+      name: refresh_token
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    OAuthCallbackRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+
+    PasswordChangeRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+
+    EmailVerificationRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+
+    AccessTokenResponse:
+      type: object
+      required: [accessToken, expiresIn]
+      properties:
+        accessToken:
+          type: string
+        expiresIn:
+          type: integer
